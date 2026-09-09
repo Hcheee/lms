@@ -1,0 +1,13 @@
+# Cấu hình cục bộ
+config.local.php
+.env
+.env.*
+
+# Thư mục upload
+uploads/
+
+# File chứa mật khẩu
+*.password
+*.passwd
+password.txt
+passwords.txt
