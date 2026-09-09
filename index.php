@@ -116,6 +116,12 @@ function e($value): string
 <?php endif; ?>
 
 <h1>Danh sách khóa học</h1>
+    <?php if ($keyword !== ''): ?>
+        <p>
+            Kết quả tìm kiếm cho:
+            <strong><?= e($keyword) ?></strong>
+        </p>
+    <?php endif; ?>
 
 <div class="search-box">
 
