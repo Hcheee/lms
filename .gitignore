@@ -1,4 +1,5 @@
 # Cấu hình cục bộ
+config.php
 config.local.php
 .env
 .env.*
