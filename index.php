@@ -115,7 +115,9 @@ function e($value): string
     </div>
 <?php endif; ?>
 
+
 <h1>Danh sách khóa học - Main</h1>
+
 
 <div class="search-box">
 
