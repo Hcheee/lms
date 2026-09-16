@@ -1,166 +1,86 @@
 <?php
 
-require __DIR__ . '/db.php';
+require __DIR__ . '/bootstrap.php';
+
+use App\Exception\ValidationException;
 
 $errors = [];
 
 $title = '';
 $level = '';
 $duration_hours = '';
-
-$allowedLevels = [
-    'co-ban',
-    'trung-cap',
-    'nang-cao'
-];
-
-function e($value): string
-{
-    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
-}
-
-function createSlug(string $text): string
-{
-    $text = trim($text);
-
-    $text = mb_strtolower($text, 'UTF-8');
-
-    $map = [
-        'à'=>'a', 'á'=>'a', 'ạ'=>'a', 'ả'=>'a', 'ã'=>'a',
-        'â'=>'a', 'ầ'=>'a', 'ấ'=>'a', 'ậ'=>'a', 'ẩ'=>'a', 'ẫ'=>'a',
-        'ă'=>'a', 'ằ'=>'a', 'ắ'=>'a', 'ặ'=>'a', 'ẳ'=>'a', 'ẵ'=>'a',
-
-        'è'=>'e', 'é'=>'e', 'ẹ'=>'e', 'ẻ'=>'e', 'ẽ'=>'e',
-        'ê'=>'e', 'ề'=>'e', 'ế'=>'e', 'ệ'=>'e', 'ể'=>'e', 'ễ'=>'e',
-
-        'ì'=>'i', 'í'=>'i', 'ị'=>'i', 'ỉ'=>'i', 'ĩ'=>'i',
-
-        'ò'=>'o', 'ó'=>'o', 'ọ'=>'o', 'ỏ'=>'o', 'õ'=>'o',
-        'ô'=>'o', 'ồ'=>'o', 'ố'=>'o', 'ộ'=>'o', 'ổ'=>'o', 'ỗ'=>'o',
-        'ơ'=>'o', 'ờ'=>'o', 'ớ'=>'o', 'ợ'=>'o', 'ở'=>'o', 'ỡ'=>'o',
-
-        'ù'=>'u', 'ú'=>'u', 'ụ'=>'u', 'ủ'=>'u', 'ũ'=>'u',
-        'ư'=>'u', 'ừ'=>'u', 'ứ'=>'u', 'ự'=>'u', 'ử'=>'u', 'ữ'=>'u',
-
-        'ỳ'=>'y', 'ý'=>'y', 'ỵ'=>'y', 'ỷ'=>'y', 'ỹ'=>'y',
-
-        'đ'=>'d'
-    ];
-
-    $text = strtr($text, $map);
-
-    $text = preg_replace('/[^a-z0-9]+/', '-', $text);
-    $text = trim($text, '-');
-
-    return $text;
-}
+$is_published = 0;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $title = trim($_POST['title'] ?? '');
+    $title = $_POST['title'] ?? '';
     $level = $_POST['level'] ?? '';
-    $duration_hours = trim($_POST['duration_hours'] ?? '');
+    $duration_hours = $_POST['duration_hours'] ?? '';
+    $is_published = isset($_POST['is_published']) ? 1 : 0;
 
-    // Kiểm tra tiêu đề
-    if ($title === '') {
-        $errors['title'] = 'Vui lòng nhập tiêu đề.';
-    } elseif (mb_strlen($title, 'UTF-8') > 180) {
-        $errors['title'] = 'Tiêu đề không được vượt quá 180 ký tự.';
-    }
+    try {
 
-    // Kiểm tra số giờ
-    if ($duration_hours === '') {
-        $errors['duration_hours'] = 'Vui lòng nhập số giờ.';
-    } elseif (
-        filter_var($duration_hours, FILTER_VALIDATE_INT) === false ||
-        (int)$duration_hours < 1 ||
-        (int)$duration_hours > 500
-    ) {
-        $errors['duration_hours'] = 'Số giờ phải từ 1 đến 500.';
-    }
-
-    // Kiểm tra level
-    if (!in_array($level, $allowedLevels, true)) {
-        $errors['level'] = 'Level không hợp lệ.';
-    }
-
-    // Nếu không có lỗi thì thêm dữ liệu
-    if (!$errors) {
-
-        $slug = createSlug($title);
-
-        // Kiểm tra slug trùng
-        $check = $pdo->prepare(
-            'SELECT COUNT(*) FROM courses WHERE slug = :slug'
-        );
-
-        $check->execute([
-            'slug' => $slug
-        ]);
-
-        if ((int)$check->fetchColumn() > 0) {
-
-            $errors['title'] =
-                'Tiêu đề tạo ra slug đã tồn tại. Vui lòng chọn tiêu đề khác.';
-        }
-    }
-
-    if (!$errors) {
-
-        $stmt = $pdo->prepare(
-            'INSERT INTO courses
-                (title, slug, level, duration_hours, is_published, is_deleted)
-             VALUES
-                (:title, :slug, :level, :duration_hours, 0, 0)'
-        );
-
-        $stmt->execute([
+        $courseService->create([
             'title' => $title,
-            'slug' => $slug,
             'level' => $level,
-            'duration_hours' => (int)$duration_hours
+            'duration_hours' => $duration_hours,
+            'is_published' => $is_published,
         ]);
 
-        // POST-Redirect-GET
         header('Location: index.php?success=1');
         exit;
+
+    } catch (ValidationException $e) {
+
+        $errors = $e->getErrors();
+
+    } catch (Throwable $e) {
+
+        $errors['general'] = 'Có lỗi xảy ra. Vui lòng thử lại.';
     }
 }
 
+function e($value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="vi">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Thêm khóa học</title>
 
     <style>
-
         body {
             font-family: Arial, sans-serif;
             max-width: 700px;
             margin: 40px auto;
-            padding: 20px;
+            padding: 0 20px;
             background: #f5f5f5;
         }
 
-        form {
+        h1 {
+            margin-bottom: 25px;
+        }
+
+        .form-box {
             background: white;
             padding: 25px;
             border-radius: 8px;
         }
 
+        .form-group {
+            margin-bottom: 18px;
+        }
+
         label {
             display: block;
-            margin-top: 15px;
-            margin-bottom: 5px;
+            margin-bottom: 7px;
             font-weight: bold;
         }
 
@@ -169,115 +89,179 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 100%;
             box-sizing: border-box;
             padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        input[type="checkbox"] {
+            width: auto;
         }
 
         .error {
-            color: #c00;
-            margin-top: 5px;
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 8px;
+            margin-top: 6px;
+            border-radius: 4px;
+        }
+
+        .general-error {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
         }
 
         button {
-            margin-top: 20px;
-            padding: 10px 20px;
+            padding: 10px 18px;
             cursor: pointer;
         }
 
-        .back {
-            display: inline-block;
-            margin-top: 20px;
+        a {
+            margin-left: 10px;
         }
-
     </style>
-
 </head>
 
 <body>
 
 <h1>Thêm khóa học</h1>
 
-<form method="post">
+<div class="form-box">
 
-    <label for="title">Tiêu đề</label>
-
-    <input
-        type="text"
-        id="title"
-        name="title"
-        maxlength="500"
-        value="<?= e($title) ?>"
-    >
-
-    <?php if (isset($errors['title'])): ?>
-
-        <div class="error">
-            <?= e($errors['title']) ?>
+    <?php if (isset($errors['general'])): ?>
+        <div class="general-error">
+            <?= e($errors['general']) ?>
         </div>
-
     <?php endif; ?>
 
+    <form method="post">
 
-    <label for="level">Level</label>
+        <!-- Tiêu đề -->
+        <div class="form-group">
 
-    <select id="level" name="level">
+            <label for="title">
+                Tiêu đề
+            </label>
 
-        <option value="">-- Chọn level --</option>
+            <input
+                type="text"
+                id="title"
+                name="title"
+                value="<?= e($title) ?>"
+            >
 
-        <option value="co-ban"
-            <?= $level === 'co-ban' ? 'selected' : '' ?>>
-            Cơ bản
-        </option>
+            <?php if (isset($errors['title'])): ?>
+                <div class="error">
+                    <?= e($errors['title']) ?>
+                </div>
+            <?php endif; ?>
+            <?php if (isset($errors['slug'])): ?>
+            <div class="error">
+            <?= e($errors['slug']) ?>
+            </div>
+<?php endif; ?>
 
-        <option value="trung-cap"
-            <?= $level === 'trung-cap' ? 'selected' : '' ?>>
-            Trung cấp
-        </option>
-
-        <option value="nang-cao"
-            <?= $level === 'nang-cao' ? 'selected' : '' ?>>
-            Nâng cao
-        </option>
-
-    </select>
-
-    <?php if (isset($errors['level'])): ?>
-
-        <div class="error">
-            <?= e($errors['level']) ?>
         </div>
 
-    <?php endif; ?>
 
+        <!-- Level -->
+        <div class="form-group">
 
-    <label for="duration_hours">
-        Số giờ học
-    </label>
+            <label for="level">
+                Level
+            </label>
 
-   <input
-    type="number"
-    id="duration_hours"
-    name="duration_hours"
-    value="<?= e($duration_hours) ?>"
->
+            <select id="level" name="level">
 
-    <?php if (isset($errors['duration_hours'])): ?>
+                <option value="">
+                    -- Chọn level --
+                </option>
 
-        <div class="error">
-            <?= e($errors['duration_hours']) ?>
+                <option
+                    value="co-ban"
+                    <?= $level === 'co-ban' ? 'selected' : '' ?>
+                >
+                    Cơ bản
+                </option>
+
+                <option
+                    value="trung-cap"
+                    <?= $level === 'trung-cap' ? 'selected' : '' ?>
+                >
+                    Trung cấp
+                </option>
+
+                <option
+                    value="nang-cao"
+                    <?= $level === 'nang-cao' ? 'selected' : '' ?>
+                >
+                    Nâng cao
+                </option>
+
+            </select>
+
+            <?php if (isset($errors['level'])): ?>
+                <div class="error">
+                    <?= e($errors['level']) ?>
+                </div>
+            <?php endif; ?>
+
         </div>
 
-    <?php endif; ?>
+
+        <!-- Số giờ -->
+        <div class="form-group">
+
+            <label for="duration_hours">
+                Số giờ
+            </label>
+
+            <input
+                type="number"
+                id="duration_hours"
+                name="duration_hours"
+                value="<?= e($duration_hours) ?>"
+            >
+
+            <?php if (isset($errors['duration_hours'])): ?>
+                <div class="error">
+                    <?= e($errors['duration_hours']) ?>
+                </div>
+            <?php endif; ?>
+
+        </div>
 
 
-    <button type="submit">
-        Thêm khóa học
-    </button>
+        <!-- Xuất bản -->
+        <div class="form-group">
 
-</form>
+            <label>
+                <input
+                    type="checkbox"
+                    name="is_published"
+                    value="1"
+                    <?= $is_published ? 'checked' : '' ?>
+                >
 
-<a class="back" href="index.php">
-    ← Quay lại danh sách
-</a>
+                Xuất bản
+            </label>
+
+        </div>
+
+
+        <button type="submit">
+            Thêm khóa học
+        </button>
+
+        <a href="index.php">
+            Quay lại
+        </a>
+
+    </form>
+
+</div>
 
 </body>
-
 </html>

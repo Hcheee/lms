@@ -12,3 +12,4 @@ uploads/
 *.passwd
 password.txt
 passwords.txt
+/vendor/

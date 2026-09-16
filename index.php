@@ -1,6 +1,6 @@
 <?php
 
-require __DIR__ . '/db.php';
+require __DIR__ . '/bootstrap.php';
 
 $keyword = trim($_GET['keyword'] ?? '');
 $level = $_GET['level'] ?? '';
@@ -11,35 +11,20 @@ if (!in_array($level, $allowedLevels, true)) {
     $level = '';
 }
 
-$sql = "
-    SELECT id, title, slug, level, duration_hours, is_published, created_at
-    FROM courses
-    WHERE is_deleted = 0
-";
+$result = $repository->all(
+    search: $keyword,
+    level: $level,
+    page: 1,
+    perPage: 100
+);
 
-$params = [];
-
-if ($keyword !== '') {
-    $sql .= " AND title LIKE :keyword";
-    $params['keyword'] = '%' . $keyword . '%';
-}
-
-if ($level !== '') {
-    $sql .= " AND level = :level";
-    $params['level'] = $level;
-}
-
-$sql .= " ORDER BY created_at DESC";
-
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-
-$courses = $stmt->fetchAll();
+$courses = $result['items'];
 
 function e($value): string
 {
-    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -98,6 +83,7 @@ function e($value): string
             background: white;
             padding: 20px;
         }
+
         .success {
             color: green;
             background: #e8f5e9;
@@ -109,15 +95,14 @@ function e($value): string
 </head>
 
 <body>
-    <?php if (isset($_GET['success'])): ?>
+
+<?php if (isset($_GET['success'])): ?>
     <div class="success">
         Thêm khóa học thành công!
     </div>
 <?php endif; ?>
 
-
 <h1>Danh sách khóa học - Main</h1>
-
 
 <div class="search-box">
 
@@ -177,35 +162,36 @@ function e($value): string
     <?php foreach ($courses as $course): ?>
 
         <tr>
-            <td><?= e($course['id']) ?></td>
+            <td><?= e($course->id) ?></td>
 
-            <td><?= e($course['title']) ?></td>
+            <td><?= e($course->title) ?></td>
 
-            <td><?= e($course['slug']) ?></td>
+            <td><?= e($course->slug) ?></td>
 
-            <td><?= e($course['level']) ?></td>
+            <td><?= e($course->level) ?></td>
 
-            <td><?= e($course['duration_hours']) ?></td>
+            <td><?= e($course->duration_hours) ?></td>
 
             <td>
-                <?= $course['is_published'] ? 'Có' : 'Chưa' ?>
+                <?= $course->is_published ? 'Có' : 'Chưa' ?>
             </td>
 
-            <td><?= e($course['created_at']) ?></td>
+            <td><?= e($course->created_at) ?></td>
+
             <td>
-                <a href="edit.php?id=<?= (int)$course['id'] ?>">
-                Sửa
+                <a href="edit.php?id=<?= (int) $course->id ?>">
+                    Sửa
                 </a>
 
                 |
 
                 <a
-                href="delete.php?id=<?= (int)$course['id'] ?>"
-                onclick="return confirm('Bạn có chắc muốn xóa khóa học này?');"
+                    href="delete.php?id=<?= (int) $course->id ?>"
+                    onclick="return confirm('Bạn có chắc muốn xóa khóa học này?');"
                 >
-                Xóa
+                    Xóa
                 </a>
-                </td>
+            </td>
         </tr>
 
     <?php endforeach; ?>
